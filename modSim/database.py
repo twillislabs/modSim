@@ -271,7 +271,12 @@ class Database:
             return {"success": False, "deleted": False, "errors": [str(e)]}
 
     def upsert_server(self, server: dict) -> dict:
-        """Insert or replace one server row."""
+        """Insert one server row, or update it in place if it already exists.
+
+        Uses ON CONFLICT DO UPDATE rather than INSERT OR REPLACE: REPLACE
+        deletes the existing row first, which cascades through the slaves
+        foreign key and silently wipes every slave of the server being edited.
+        """
         server_id = server.get("server_id")
         port = server.get("port")
         if server_id is None:
@@ -283,9 +288,16 @@ class Database:
             try:
                 cursor = conn.cursor()
                 cursor.execute(
-                    """INSERT OR REPLACE INTO servers
+                    """INSERT INTO servers
                        (server_id, ip, port, vendor_name, product_code, version, zero_based)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                       VALUES (?, ?, ?, ?, ?, ?, ?)
+                       ON CONFLICT(server_id) DO UPDATE SET
+                           ip = excluded.ip,
+                           port = excluded.port,
+                           vendor_name = excluded.vendor_name,
+                           product_code = excluded.product_code,
+                           version = excluded.version,
+                           zero_based = excluded.zero_based""",
                     (
                         server_id,
                         server.get("ip", "0.0.0.0"),

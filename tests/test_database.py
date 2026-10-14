@@ -404,6 +404,18 @@ class TestServerZeroBased:
         row = temp_db.get_servers()[0]
         assert row["zero_based"] is False
 
+    def test_upsert_existing_server_keeps_slaves(self, temp_db):
+        """Editing a server must update it in place, not cascade-delete its slaves."""
+        temp_db.upsert_server({"server_id": 0, "ip": "0.0.0.0", "port": 502})
+        temp_db.upsert_slave({"server_id": 0, "slave_id": 0})
+        temp_db.upsert_slave({"server_id": 0, "slave_id": 1})
+
+        temp_db.upsert_server({"server_id": 0, "ip": "0.0.0.1", "port": 502})
+        temp_db.upsert_server({"server_id": 0, "ip": "0.0.0.0", "port": 502})
+
+        assert temp_db.get_servers()[0]["ip"] == "0.0.0.0"
+        assert [s["slave_id"] for s in temp_db.get_slaves(0)] == [0, 1]
+
     def test_save_server_config_round_trip(self, temp_db):
         temp_db.save_server_config(
             [{"server_id": 0, "port": 502, "zero_based": False},
