@@ -213,6 +213,9 @@ class Server:
             },
             "web": {
                 "port": 8000
+            },
+            "simulation": {
+                "interval_seconds": 1
             }
         }
         
@@ -233,10 +236,16 @@ class Server:
 
     def run(self):
         """ Main loop """
+        interval = self.settings.get("simulation", {}).get("interval_seconds", 1)
         while not self.signal_handler.stop:
+            registers = self.database.get_registers()
             for server in self.modbus_servers.values():
-                server.simulate(self.database.get_registers())
-            time.sleep(1)
+                try:
+                    server.simulate(registers)
+                except Exception:
+                    logger.exception("Server %s: simulate() failed; continuing with the others",
+                                     server.serverId)
+            time.sleep(interval)
 
         self.stop_servers()
 

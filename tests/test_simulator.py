@@ -348,3 +348,36 @@ class TestSimulationEngine:
         config = {"equation": "open('file.txt')"}
         value = engine._generate_equation(False, config, 100, 0, 0, reg_key)
         assert isinstance(value, int)
+
+    def test_generate_triangle_ramps_up_then_down(self, monkeypatch):
+        """Triangle mode reaches max at half period and returns to min"""
+        engine = SimulationEngine()
+        reg_key = "0_0_hr_100"
+        config = {"min": 0, "max": 100, "period_seconds": 60}
+        now = [1000.0]
+        monkeypatch.setattr("modSim.simulator.time.time", lambda: now[0])
+
+        values = []
+        for t in (0, 15, 30, 45, 60):
+            now[0] = 1000.0 + t
+            values.append(engine._generate_triangle(False, config, reg_key))
+
+        assert values == [0, 50, 100, 50, 0]
+
+    def test_generate_triangle_boolean(self, monkeypatch):
+        """Triangle mode on a boolean register is True above the midpoint"""
+        engine = SimulationEngine()
+        reg_key = "0_0_co_1"
+        config = {"min": 0, "max": 1, "period_seconds": 10}
+        now = [0.0]
+        monkeypatch.setattr("modSim.simulator.time.time", lambda: now[0])
+
+        assert engine._generate_triangle(True, config, reg_key) is False
+        now[0] = 5.0
+        assert engine._generate_triangle(True, config, reg_key) is True
+
+    def test_generate_value_triangle_mode(self):
+        """generate_value dispatches the triangle mode"""
+        engine = SimulationEngine()
+        value = engine.generate_value("triangle", {"min": 10, "max": 20}, "hr", 1, 0, 0)
+        assert 10 <= value <= 20

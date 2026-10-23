@@ -2,6 +2,7 @@
 import math
 import random
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +13,7 @@ class SimulationEngine:
     def __init__(self):
         self.counter = 0
         self.register_counters = {}  # Track individual counters per register
+        self.register_start_times = {}  # Per-register start time for time-based modes
 
     def increment_counter(self):
         """Increment global counter"""
@@ -52,6 +54,8 @@ class SimulationEngine:
                 raw = self._generate_sine(is_boolean, config, reg_key, float32)
             elif mode == "square":
                 raw = self._generate_square(is_boolean, config, reg_key, float32)
+            elif mode == "triangle":
+                raw = self._generate_triangle(is_boolean, config, reg_key, float32)
             else:
                 logger.warning(f"Unknown simulation mode: {mode}, defaulting to random")
                 raw = self._generate_random(is_boolean, config, float32)
@@ -171,3 +175,29 @@ class SimulationEngine:
         if is_boolean:
             return bool(value)
         return float(value) if float32 else int(value)
+
+    def _generate_triangle(self, is_boolean, config, reg_key, float32=False):
+        """Time-based triangle wave: min -> max over half the period, then back down.
+
+        Config: min (0), max (100), period_seconds (60), round (True).
+        """
+        min_val = config.get("min", 0)
+        max_val = config.get("max", 100)
+        period = float(config.get("period_seconds", 60))
+        if period <= 0:
+            period = 60.0
+
+        start = self.register_start_times.setdefault(reg_key, time.time())
+        pos = (time.time() - start) % period
+        half = period / 2.0
+        span = max_val - min_val
+        if pos <= half:
+            value = min_val + span * (pos / half)
+        else:
+            value = max_val - span * ((pos - half) / half)
+
+        if is_boolean:
+            return value >= min_val + span / 2.0
+        if float32:
+            return float(value)
+        return int(round(value)) if config.get("round", True) else value
