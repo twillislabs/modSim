@@ -1,5 +1,6 @@
 """Handles Modbus objects"""
 import asyncio
+import json
 import logging
 import struct
 import threading
@@ -154,6 +155,7 @@ class Server(threading.Thread):
         self.running = False
         self.regiser_type_map = {"all": 0, "co": 1, "hr": 3, "di": 2, "ir": 4}
         self.simulation_engine = SimulationEngine()
+        self._static_written = {}  # static rule key -> config last written
         # Prefer an explicit slave spec (real ids + per-slave sizes); fall back
         # to the legacy count, which yields slave ids 0..number_of_slaves-1.
         self.context = buildModbusContext(
@@ -300,6 +302,17 @@ class Server(threading.Thread):
             if reg_type_key not in register_type_map:
                 logger.warning("Unsupported register type: %r; skipping.", reg_type_key)
                 continue
+
+            # Write a static rule only when it is new or its config changed, so
+            # a value a Modbus client writes (e.g. a setpoint from Ignition)
+            # persists until the rule changes or the server restarts.
+            if reg.get("simulation_mode") == "static":
+                key = (slave_id, reg_type_key, reg.get("address"), reg.get("address_end"),
+                       reg.get("register_size"))
+                fingerprint = json.dumps(reg.get("simulation_config", {}), sort_keys=True)
+                if self._static_written.get(key) == fingerprint:
+                    continue
+                self._static_written[key] = fingerprint
 
             simulation_mode = reg.get("simulation_mode", "random")
             simulation_config = reg.get("simulation_config", {})

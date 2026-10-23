@@ -6,7 +6,7 @@ A configurable Modbus TCP server with a browser-based UI and REST API. Supports 
 
 - **Modbus TCP** — multiple server instances, each with one or more slaves
 - **Browser UI** — dashboard, live register view, server/rule management, import/export, mobile-friendly
-- **Six simulation modes** — `random`, `static`, `sine`, `ramp`, `square`, `equation`
+- **Seven simulation modes** — `random`, `static`, `sine`, `ramp`, `square`, `triangle`, `equation`
 - **Per-rule CRUD** — add, edit, and delete individual simulation rules without restart
 - **Import / Export** — backup and restore configuration (servers, slaves, or rules) as JSON; merge (additive/sync) or replace modes, with selective section support
 - **Persistent storage** — all runtime configuration stored in SQLite (`settings.db`)
@@ -149,7 +149,7 @@ modSim uses a two-layer configuration system:
 | Startup defaults | `settings.json` | Seeds the database on first run only |
 | Runtime config | `settings.db` | All live configuration; survives restarts |
 
-After the first run, use the web UI or API to change configuration — edits to `settings.json` are ignored unless `settings.db` is deleted.
+After the first run, use the web UI or API to change configuration — edits to the `modbus` section of `settings.json` are ignored unless `settings.db` is deleted. `web` and `simulation` are read on every start.
 
 ### Default `settings.json`
 
@@ -170,9 +170,12 @@ After the first run, use the web UI or API to change configuration — edits to 
     "config": {
       "registers": [{ "slave_id": 0, "register_type": "all", "simulate": true }]
     }
-  }
+  },
+  "simulation": { "interval_seconds": 1 }
 }
 ```
+
+`simulation.interval_seconds` is the time between simulation cycles.
 
 > To reset all configuration, delete `settings.db` and restart.
 
@@ -499,7 +502,7 @@ Generates a random integer each cycle.
 
 ### `static`
 
-Returns a fixed value every cycle.
+Writes a fixed value when the rule is new or its config changes. It is not rewritten each cycle, so a value a Modbus client writes (e.g. a setpoint from Ignition) persists until the rule changes or the servers restart.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -566,6 +569,26 @@ Alternates between two values based on a duty cycle.
 
 ---
 
+### `triangle`
+
+Ramps linearly from `min` to `max` over half the period and back down over the other half. Time-based, so independent of the simulation interval.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `min` | `0` | Lowest value |
+| `max` | `100` | Highest value |
+| `period_seconds` | `60` | Full up-and-down cycle, in seconds |
+| `round` | `true` | Round to an integer (ignored with `float32`) |
+
+```json
+{
+  "simulation_mode": "triangle",
+  "simulation_config": { "min": 0, "max": 100, "period_seconds": 60 }
+}
+```
+
+---
+
 ### `equation`
 
 Evaluates a Python expression each cycle. Counter variable `x` increments per tick per register.
@@ -596,6 +619,7 @@ All modes work with coil/discrete-input registers:
 | `ramp` | `True` when value is odd |
 | `sine` | `True` when value > offset |
 | `square` | `bool(high)` during ON phase |
+| `triangle` | `True` in the upper half of the range |
 | `equation` | `bool(result)` |
 
 ---
@@ -603,8 +627,8 @@ All modes work with coil/discrete-input registers:
 ### Simulation notes
 
 - Each register in a range rule gets its own independent counter
-- Counters increment once per simulation cycle (default ≈ 1 second)
-- `period` for `sine`/`square`/`ramp` is in simulation ticks, not seconds (though with a 1 s cycle they are equivalent)
+- Counters increment once per simulation cycle (`simulation.interval_seconds`, default 1 s)
+- `period` for `sine`/`square`/`ramp` is in simulation ticks, not seconds (though with a 1 s cycle they are equivalent); `triangle` uses `period_seconds`
 - `register_size` in a rule overrides the slave's configured size for address-range validation only
 
 ---
@@ -657,6 +681,7 @@ pytest --cov=modSim --cov-report=html   # with coverage
 pytest tests/test_simulator.py  # simulation engine only
 pytest tests/test_database.py   # database only
 pytest tests/test_web.py        # API endpoints only
+pytest tests/test_modbus.py     # static register write-once
 pytest -v                       # verbose
 ```
 

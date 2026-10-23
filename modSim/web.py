@@ -354,7 +354,7 @@ class WebServer(threading.Thread):
                 "- **Import / Export** — backup and restore the full configuration as a single JSON file\n"
                 "- **System** — restart the Modbus servers without restarting the process\n\n"
                 "Interactive UI is served at **/**. "
-                "Simulation modes: `random`, `static`, `sine`, `ramp`, `square`, `equation`."
+                "Simulation modes: `random`, `static`, `sine`, `ramp`, `square`, `triangle`, `equation`."
             ),
             version="1.0.0",
             license_info={
@@ -943,6 +943,7 @@ class WebServer(threading.Thread):
         - ramp: Linear ramp between min and max
         - equation: Custom equation-based simulation
         - square: Square wave (for coils/discrete inputs)
+        - triangle: Time-based linear up/down ramp
         """
         try:
             result = self.database.save_registers(config.registers)

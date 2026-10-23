@@ -366,6 +366,7 @@ function fillModeDefaults() {
         sine:     '{"amplitude": 100.0, "offset": 500.0, "period": 60}',
         ramp:     '{"min": 0.0, "max": 1000.0, "step": 0.5}',
         square:   '{"high": 100.0, "low": 0.0, "period": 20, "duty_cycle": 0.5}',
+        triangle: '{"min": 0.0, "max": 100.0, "period_seconds": 60}',
         equation: '{"equation": "sin(x * 0.1) * 100"}'
     } : {
         static:   '{"value": 0}',
@@ -373,6 +374,7 @@ function fillModeDefaults() {
         sine:     '{"amplitude": 100, "offset": 500, "period": 60}',
         ramp:     '{"min": 0, "max": 1000, "step": 10}',
         square:   '{"high": 1, "low": 0, "period": 20, "duty_cycle": 0.5}',
+        triangle: '{"min": 0, "max": 100, "period_seconds": 60}',
         equation: '{"equation": "(x + address) % 1000"}'
     };
     if (defaults[mode]) document.getElementById('erConfig').value = defaults[mode];
